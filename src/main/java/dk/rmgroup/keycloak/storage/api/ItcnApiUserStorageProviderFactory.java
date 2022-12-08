@@ -4,6 +4,7 @@ import static dk.rmgroup.keycloak.storage.api.ItcnApiUserStorageProviderConstant
 import static dk.rmgroup.keycloak.storage.api.ItcnApiUserStorageProviderConstants.CONFIG_KEY_LOGIN_URL;
 import static dk.rmgroup.keycloak.storage.api.ItcnApiUserStorageProviderConstants.CONFIG_KEY_PASSWORD;
 import static dk.rmgroup.keycloak.storage.api.ItcnApiUserStorageProviderConstants.CONFIG_KEY_USERNAME;
+import static dk.rmgroup.keycloak.storage.api.ItcnApiUserStorageProviderConstants.CONFIG_KEY_ALLOW_UPDATE_UPN_DOMAINS;
 
 import java.io.BufferedReader;
 import java.io.InputStream;
@@ -13,12 +14,12 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-
 import org.jboss.logging.Logger;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -56,19 +57,25 @@ public class ItcnApiUserStorageProviderFactory
         .name(CONFIG_KEY_USERNAME)
         .label("Username")
         .type(ProviderConfigProperty.STRING_TYPE)
-        .helpText("Username used for authentication")
+        .helpText("Username used for Login endpoint")
         .add()
         .property()
         .name(CONFIG_KEY_PASSWORD)
         .label("Password")
         .type(ProviderConfigProperty.STRING_TYPE)
-        .helpText("Password used for authentication")
+        .helpText("Password used for Login endpoint")
         .add()
         .property()
         .name(CONFIG_KEY_ACTIVE_DIRECTORY_URL)
         .label("ActiveDirectory endpoint URL")
         .type(ProviderConfigProperty.STRING_TYPE)
         .helpText("URL to the ActiveDirectory endpoint")
+        .add()
+        .property()
+        .name(CONFIG_KEY_ALLOW_UPDATE_UPN_DOMAINS)
+        .label("Allow taking over users from UPN domains")
+        .type(ProviderConfigProperty.STRING_TYPE)
+        .helpText("Allow taking over federation for users whose UPN is one of the domains in this comma separated list. Note that this may overwrite data on existing users in the database!")
         .add()
         .build();
   }
@@ -121,11 +128,17 @@ public class ItcnApiUserStorageProviderFactory
       return synchronizationResult;
     }
 
-    return importApiUsers(sessionFactory, realmId, model, apiUsers);
+    String allowUpdateUpnDomainsCommaSeparated = model.get(CONFIG_KEY_ALLOW_UPDATE_UPN_DOMAINS);
+    List<String> allowUpdateUpnDomains = null;
+    if (allowUpdateUpnDomainsCommaSeparated != null && allowUpdateUpnDomainsCommaSeparated.length() > 0) {
+      allowUpdateUpnDomains = Arrays.stream(allowUpdateUpnDomainsCommaSeparated.split(",")).map(d -> d.trim()).collect(Collectors.toList());
+    }
+
+    return importApiUsers(sessionFactory, realmId, model, apiUsers, allowUpdateUpnDomains);
   }
 
   private SynchronizationResult importApiUsers(KeycloakSessionFactory sessionFactory, final String realmId,
-      final ComponentModel fedModel, List<ItcnApiUser> apiUsers) {
+      final ComponentModel fedModel, List<ItcnApiUser> apiUsers, List<String> allowUpdateUpnDomains) {
     final SynchronizationResult syncResult = new SynchronizationResult();
 
     final String fedId = fedModel.getId();
@@ -172,13 +185,25 @@ public class ItcnApiUserStorageProviderFactory
             if (existingLocalUser == null) {
               importedUser = userProvider.addUser(realm, apiUser.getUpn());
             } else {
-              if (!fedId.equals(existingLocalUser.getFederationLink())) {
+              if (fedId.equals(existingLocalUser.getFederationLink())) {
+                importedUser = existingLocalUser;
+              } else if (allowUpdateUpnDomains != null) {
+                String upn = apiUser.getUpn();
+                if (!allowUpdateUpnDomains.stream().anyMatch(domain -> upn.endsWith("@" + domain))) {
+                  logger.warnf(
+                    "User with UPN '%s' is not updated during sync as he already exists in Keycloak database but is not linked to federation provider '%s' and UPN domain does not match any of '%s'",
+                    apiUser.getUpn(), fedModel.getName(), String.join(", ", allowUpdateUpnDomains));
+                  syncResult.increaseFailed();
+                  return;
+                }
+                importedUser = existingLocalUser;
+              } else {
                 logger.warnf(
                     "User with UPN '%s' is not updated during sync as he already exists in Keycloak database but is not linked to federation provider '%s'",
                     apiUser.getUpn(), fedModel.getName());
+                syncResult.increaseFailed();
                 return;
               }
-              importedUser = existingLocalUser;
             }
             importedUser.setFederationLink(fedId);
             importedUser.setEmail(apiUser.getEmail());
