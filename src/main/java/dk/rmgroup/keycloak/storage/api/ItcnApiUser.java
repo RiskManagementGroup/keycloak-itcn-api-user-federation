@@ -6,13 +6,15 @@ public class ItcnApiUser {
   private final String firstName;
   private final String surName;
   private final String mobilePhone;
+  private final String[] groups;
 
-  public ItcnApiUser(String upn, String email, String firstName, String surName, String mobilePhone) {
+  public ItcnApiUser(String upn, String email, String firstName, String surName, String mobilePhone, String[] groups) {
     this.upn = upn;
     this.email = email;
     this.firstName = firstName;
     this.surName = surName;
     this.mobilePhone = mobilePhone;
+    this.groups = groups;
   }
 
   public String getUpn() {
@@ -33,5 +35,9 @@ public class ItcnApiUser {
 
   public String getMobilePhone() {
     return mobilePhone;
+  }
+
+  public String[] getGroups() {
+    return groups;
   }
 }
