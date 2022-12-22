@@ -15,6 +15,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
@@ -89,7 +90,7 @@ public class ItcnApiUserStorageProviderFactory
         .label("Group map")
         .type(ProviderConfigProperty.STRING_TYPE)
         .helpText(
-            "Specify the group map using a json object like this: {\"An Itcn Group\": \"/A Keycoak Group\", \"Another ITCN Group\": \"/Another Keycoak Group\"}, remember that group names are case sensitive, and that you must specify the full path of the Keycloak group!")
+            "Specify the group map using a json object like this: {\"ITCN Group 1\": \"/Keycoak Group 1\", \"ITCN Group 2\": \"/Keycoak Group 2\"}, remember that group names are case sensitive!")
         .add()
         .build();
   }
@@ -136,32 +137,14 @@ public class ItcnApiUserStorageProviderFactory
     if (!config.contains(CONFIG_KEY_ACTIVE_DIRECTORY_URL)) {
       throw new ComponentValidationException("ActiveDirectory endpoint URL is required!");
     }
-    if (config.contains(CONFIG_KEY_GROUP_MAP)) {
-      try {
-        Map<String, Object> jsonMap = new JSONObject(config.get(CONFIG_KEY_GROUP_MAP)).toMap();
-        jsonMap.forEach((k, v) -> {
-          try {
-            GroupModel kcGroup = KeycloakModelUtils.findGroupByPath(realm, v.toString());
-            if (kcGroup == null) {
-              throw new ComponentValidationException(String
-                  .format("Keycloak group '%s' mapped from ITCN group '%s' not found", v, k));
-            }
-          } catch (Exception e) {
-            logger.errorf(e,
-                "Error getting Keycloak group '%s' mapped from ITCN group '%s'. Please check Group map config!",
-                v, k);
-            throw new ComponentValidationException(String
-                .format("Error getting Keycloak group '%s' mapped from ITCN group '%s'", v, k), e);
-          }
-        });
-      } catch (ComponentValidationException e) {
-        throw e;
-      } catch (Exception e) {
-        logger.errorf(e, "Error getting group map from config '%s'. Please check Group map config!",
-            config.get(CONFIG_KEY_GROUP_MAP));
-        throw new ComponentValidationException("Error parsing Group map. Please ensure that it is a valid JSON!", e);
-      }
+
+    GroupMapConfig groupMapConfig = GetGroupMapConfig(realm, config);
+
+    if (groupMapConfig.errors.size() > 0) {
+      throw new ComponentValidationException(
+          String.format("Errors found in Group map: %s", String.join(", ", groupMapConfig.errors)));
     }
+
     UserStorageProviderFactory.super.validateConfiguration(session, realm, config);
   }
 
@@ -190,55 +173,81 @@ public class ItcnApiUserStorageProviderFactory
     }
 
     String allowUpdateUpnDomainsCommaSeparated = model.get(CONFIG_KEY_ALLOW_UPDATE_UPN_DOMAINS);
+
     List<String> allowUpdateUpnDomains = null;
     if (allowUpdateUpnDomainsCommaSeparated != null && allowUpdateUpnDomainsCommaSeparated.length() > 0) {
       allowUpdateUpnDomains = Arrays.stream(allowUpdateUpnDomainsCommaSeparated.split(",")).map(d -> d.trim())
           .collect(Collectors.toList());
     }
 
-    final Map<String, GroupModel> groupMap = (model.contains(CONFIG_KEY_GROUP_MAP))
-        ? JsonToGroupMap(sessionFactory, realmId, model.get(CONFIG_KEY_GROUP_MAP))
-        : null;
+    GroupMapConfig groupMapConfig = GetGroupMapConfig(sessionFactory, realmId, model);
 
-    return importApiUsers(sessionFactory, realmId, model, apiUsers, allowUpdateUpnDomains, groupMap);
+    return importApiUsers(sessionFactory, realmId, model, apiUsers, allowUpdateUpnDomains, groupMapConfig.groupMap);
   }
 
-  private Map<String, GroupModel> JsonToGroupMap(KeycloakSessionFactory sessionFactory, final String realmId,
-      final String json) {
+  class GroupMapConfig {
+    private Map<String, GroupModel> groupMap = new HashMap<String, GroupModel>();
 
-    Map<String, GroupModel> groupMap = new HashMap<String, GroupModel>();
+    private List<String> errors = new ArrayList<String>();
 
-    KeycloakModelUtils.runJobInTransaction(sessionFactory, new KeycloakSessionTask() {
+    public Map<String, GroupModel> getGroupMap() {
+      return groupMap;
+    }
 
-      @Override
-      public void run(KeycloakSession session) {
-        RealmModel realm = session.realms().getRealm(realmId);
-        try {
-          Map<String, Object> jsonMap = new JSONObject(json).toMap();
-          jsonMap.forEach((k, v) -> {
-            try {
-              GroupModel kcGroup = KeycloakModelUtils.findGroupByPath(realm, v.toString());
-              if (kcGroup != null) {
-                groupMap.put(k, kcGroup);
-              } else {
-                logger.errorf(
-                    "Keycloak group '%s' mapped from ITCN group '%s' not found. Please check Group map config!",
-                    v, k);
-              }
-            } catch (Exception e) {
-              logger.errorf(e,
-                  "Error getting Keycloak group '%s' mapped from ITCN group '%s'. Please check Group map config!",
-                  v, k);
-            }
-          });
-        } catch (Exception e) {
-          logger.errorf(e, "Error getting group map from config '%s'. Please check Group map config!",
-              json);
-        }
-      }
+    public List<String> getErrors() {
+      return errors;
+    }
+
+    public void setProperties(GroupMapConfig groupMapConfig) {
+      groupMap = groupMapConfig.groupMap;
+      errors = groupMapConfig.errors;
+    }
+  }
+
+  private GroupMapConfig GetGroupMapConfig(KeycloakSessionFactory sessionFactory, final String realmId,
+      ComponentModel config) {
+    final GroupMapConfig groupMapConfig = new GroupMapConfig();
+    KeycloakModelUtils.runJobInTransaction(sessionFactory, session -> {
+      RealmModel realm = session.realms().getRealm(realmId);
+      groupMapConfig.setProperties(GetGroupMapConfig(realm, config));
     });
+    return groupMapConfig;
+  }
 
-    return groupMap;
+  private GroupMapConfig GetGroupMapConfig(RealmModel realm, ComponentModel config) {
+    GroupMapConfig groupMapConfig = new GroupMapConfig();
+    Map<String, GroupModel> groupMap = groupMapConfig.groupMap;
+    List<String> errors = groupMapConfig.errors;
+
+    if (config.contains(CONFIG_KEY_GROUP_MAP)) {
+      String json = config.get(CONFIG_KEY_GROUP_MAP);
+
+      try {
+        Map<String, Object> jsonMap = new JSONObject(json).toMap();
+        jsonMap.forEach((k, v) -> {
+          try {
+            GroupModel kcGroup = KeycloakModelUtils.findGroupByPath(realm, v.toString());
+            if (kcGroup != null) {
+              groupMap.put(k, kcGroup);
+            } else {
+              String errorMessage = String.format("Keycloak group '%s' not found.", v);
+              logger.error(errorMessage);
+              errors.add(errorMessage);
+            }
+          } catch (Exception e) {
+            String errorMessage = String.format("Error getting Keycloak group '%s'. '%s'", v, e.getMessage());
+            logger.error(errorMessage, e);
+            errors.add(errorMessage);
+          }
+        });
+      } catch (Exception e) {
+        String errorMessage = String.format("Error in group map JSON '%s'. '%s'", json, e.getMessage());
+        logger.error(errorMessage, e);
+        errors.add(errorMessage);
+      }
+    }
+
+    return groupMapConfig;
   }
 
   private SynchronizationResult importApiUsers(KeycloakSessionFactory sessionFactory, final String realmId,
