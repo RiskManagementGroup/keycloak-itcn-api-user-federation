@@ -1,4 +1,4 @@
-package dk.rmgroup.keycloak.storage.api;
+package dk.rmgroup.keycloak.storage.api.itcn;
 
 public final class ItcnApiUserStorageProviderConstants {
     public static final String CONFIG_KEY_LOGIN_URL = "loginUrl";
