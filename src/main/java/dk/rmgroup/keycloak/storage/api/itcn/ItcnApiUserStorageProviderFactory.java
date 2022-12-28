@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -257,8 +258,8 @@ public class ItcnApiUserStorageProviderFactory
 
     final String fedId = fedModel.getId();
 
-    final Map<String, String> apiUsersUpnMap = apiUsers.stream().map(u -> u.getUpn()).distinct()
-        .collect(Collectors.toMap(u -> u, u -> u));
+    final Set<String> apiUsersUpnSet = apiUsers.stream().map(u -> u.getUpn().toLowerCase()).distinct()
+        .collect(Collectors.toSet());
 
     KeycloakModelUtils.runJobInTransaction(sessionFactory, new KeycloakSessionTask() {
 
@@ -268,7 +269,7 @@ public class ItcnApiUserStorageProviderFactory
           RealmModel realm = session.realms().getRealm(realmId);
           UserProvider userProvider = session.users();
           List<UserModel> usersToRemove = userProvider.getUsersStream(realm)
-              .filter(u -> fedId.equals(u.getFederationLink()) && !apiUsersUpnMap.containsKey(u.getUsername()))
+              .filter(u -> fedId.equals(u.getFederationLink()) && !apiUsersUpnSet.contains(u.getUsername()))
               .collect(Collectors.toList());
           for (final UserModel user : usersToRemove) {
             try {
@@ -325,6 +326,7 @@ public class ItcnApiUserStorageProviderFactory
             importedUser.setFirstName(apiUser.getFirstName());
             importedUser.setLastName(apiUser.getSurName());
             importedUser.setSingleAttribute("mobile", apiUser.getMobilePhone());
+            importedUser.setEnabled(true);
 
             String[] apiUserGroups = apiUser.getGroups();
 
