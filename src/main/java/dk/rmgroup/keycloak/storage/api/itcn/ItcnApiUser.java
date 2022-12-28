@@ -1,4 +1,4 @@
-package dk.rmgroup.keycloak.storage.api;
+package dk.rmgroup.keycloak.storage.api.itcn;
 
 public class ItcnApiUser {
   private final String upn;

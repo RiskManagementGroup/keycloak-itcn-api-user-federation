@@ -1,11 +1,11 @@
-package dk.rmgroup.keycloak.storage.api;
+package dk.rmgroup.keycloak.storage.api.itcn;
 
-import static dk.rmgroup.keycloak.storage.api.ItcnApiUserStorageProviderConstants.CONFIG_KEY_ACTIVE_DIRECTORY_URL;
-import static dk.rmgroup.keycloak.storage.api.ItcnApiUserStorageProviderConstants.CONFIG_KEY_ALLOW_UPDATE_UPN_DOMAINS;
-import static dk.rmgroup.keycloak.storage.api.ItcnApiUserStorageProviderConstants.CONFIG_KEY_GROUP_MAP;
-import static dk.rmgroup.keycloak.storage.api.ItcnApiUserStorageProviderConstants.CONFIG_KEY_LOGIN_URL;
-import static dk.rmgroup.keycloak.storage.api.ItcnApiUserStorageProviderConstants.CONFIG_KEY_PASSWORD;
-import static dk.rmgroup.keycloak.storage.api.ItcnApiUserStorageProviderConstants.CONFIG_KEY_USERNAME;
+import static dk.rmgroup.keycloak.storage.api.itcn.ItcnApiUserStorageProviderConstants.CONFIG_KEY_ACTIVE_DIRECTORY_URL;
+import static dk.rmgroup.keycloak.storage.api.itcn.ItcnApiUserStorageProviderConstants.CONFIG_KEY_ALLOW_UPDATE_UPN_DOMAINS;
+import static dk.rmgroup.keycloak.storage.api.itcn.ItcnApiUserStorageProviderConstants.CONFIG_KEY_GROUP_MAP;
+import static dk.rmgroup.keycloak.storage.api.itcn.ItcnApiUserStorageProviderConstants.CONFIG_KEY_LOGIN_URL;
+import static dk.rmgroup.keycloak.storage.api.itcn.ItcnApiUserStorageProviderConstants.CONFIG_KEY_PASSWORD;
+import static dk.rmgroup.keycloak.storage.api.itcn.ItcnApiUserStorageProviderConstants.CONFIG_KEY_USERNAME;
 
 import java.io.BufferedReader;
 import java.io.InputStream;
@@ -97,7 +97,7 @@ public class ItcnApiUserStorageProviderFactory
 
   @Override
   public String getId() {
-    return "itcn-api-user-provider";
+    return "itcn";
   }
 
   @Override
