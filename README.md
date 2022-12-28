@@ -2,6 +2,8 @@
 
 Keycloak user storage provider for allowing user federation via the ITCN API.
 
+You can find the OpenAPI 3.0.1 documentation for the API [here](https://github.com/RiskManagementGroup/keycloak-itcn-api-user-federation/files/10314881/itcn-api-v1.1.yaml.zip)
+
 To make Keycloak recognize the user storage provider the src/main/resources/META-INF folder and its content is required.
 
 ## Build
