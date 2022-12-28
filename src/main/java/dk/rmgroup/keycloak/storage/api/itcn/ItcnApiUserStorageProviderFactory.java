@@ -415,8 +415,8 @@ public class ItcnApiUserStorageProviderFactory
           JSONArray gr = o.getJSONArray("Groups");
           groups = IntStream.range(0, gr.length()).mapToObj(j -> gr.getString(j)).toArray(String[]::new);
         }
-        return new ItcnApiUser(o.getString("UPN"), o.getString("Email"), o.getString("FirstName"),
-            o.getString("SurName"), o.getString("MobilePhone"), groups);
+        return new ItcnApiUser(o.getString("UPN"), o.getString("Email"), o.optString("FirstName"),
+            o.optString("SurName"), o.optString("MobilePhone"), groups);
       }).collect(Collectors.toList());
       return users;
     }
