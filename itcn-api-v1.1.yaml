@@ -1,0 +1,93 @@
+---
+openapi: 3.0.1
+info:
+  title: ItcnApiServices
+  version: v1.1
+servers:
+- url: /
+paths:
+  /ActiveDirectory:
+    get:
+      tags:
+      - ActiveDirectory
+      operationId: ActiveDirectory
+      responses:
+        "200":
+          description: A list of users
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActiveDirectoryOutput'
+      security:
+      - bearerAuth: []
+  /Login:
+    post:
+      tags:
+      - Authenticate
+      requestBody:
+        description: Login credentials
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginInput'
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginOutput'
+components:
+  schemas:
+    ActiveDirectoryOutput:
+      properties:
+        value:
+          type: array
+          items:
+            $ref: '#/components/schemas/ActiveDirectoryUser'
+    ActiveDirectoryUser:
+      required:
+      - Email
+      - UPN
+      properties:
+        UPN:
+          type: string
+        Email:
+          type: string
+        FirstName:
+          type: string
+        SurName:
+          type: string
+        MobilePhone:
+          type: string
+        Groups:
+          type: array
+          items:
+            type: string
+    LoginInput:
+      required:
+      - password
+      - username
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+      additionalProperties: false
+    LoginOutput:
+      required:
+      - expiration
+      - token
+      properties:
+        token:
+          type: string
+        expiration:
+          type: string
+          format: date-time
+  securitySchemes:
+    bearerAuth:
+      type: http
+      description: Please enter a valid token in input
+      scheme: bearer
+      bearerFormat: JWT
