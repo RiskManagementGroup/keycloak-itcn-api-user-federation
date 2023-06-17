@@ -5,7 +5,7 @@
 
   <groupId>dk.rmgroup.keycloak</groupId>
   <artifactId>itcn-api-user-federation</artifactId>
-  <version>20.0.5</version>
+  <version>21.1.1</version>
 
   <name>itcn-api-user-federation</name>
   <url>hhttps://github.com/RiskManagementGroup/keycloak-itcn-api-user-federation</url>
@@ -14,7 +14,7 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.compiler.source>8</maven.compiler.source>
     <maven.compiler.target>1.8</maven.compiler.target>
-    <keycloak.version>20.0.5</keycloak.version>
+    <keycloak.version>21.1.1</keycloak.version>
   </properties>
 
   <dependencies>
@@ -22,7 +22,7 @@
     <dependency>
       <groupId>org.json</groupId>
       <artifactId>json</artifactId>
-      <version>20220924</version>
+      <version>20230227</version>
     </dependency>
 
     <dependency>
@@ -49,6 +49,18 @@
     <dependency>
       <groupId>org.keycloak</groupId>
       <artifactId>keycloak-model-legacy</artifactId>
+      <version>${keycloak.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.keycloak</groupId>
+      <artifactId>keycloak-services</artifactId>
+      <version>${keycloak.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.keycloak</groupId>
+      <artifactId>keycloak-model-legacy-private</artifactId>
       <version>${keycloak.version}</version>
     </dependency>
   </dependencies>
