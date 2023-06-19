@@ -324,7 +324,7 @@ public class ItcnApiUserStorageProviderFactory
       Map<String, GroupModel> groupMap) {
     final String fedId = fedModel.getId();
 
-    final Set<String> apiUsersUpnSet = apiUsers.stream().map(u -> u.getUpn().toLowerCase()).distinct()
+    final Set<String> apiUsersUpnSet = apiUsers.stream().map(u -> u.getUpn()).distinct()
         .collect(Collectors.toSet());
 
     final AtomicInteger removedCount = new AtomicInteger(0);
