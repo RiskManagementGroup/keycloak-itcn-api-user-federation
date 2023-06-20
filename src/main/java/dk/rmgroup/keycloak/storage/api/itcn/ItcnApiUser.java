@@ -12,7 +12,7 @@ public class ItcnApiUser {
 
   public ItcnApiUser(String upn, String email, String firstName, String surName, String mobilePhone, String[] groups) {
     this.upn = Optional.ofNullable(upn).map(String::toLowerCase).orElse(upn);
-    this.email = email;
+    this.email = Optional.ofNullable(email).map(String::toLowerCase).orElse(email);;
     this.firstName = firstName;
     this.surName = surName;
     this.mobilePhone = mobilePhone;
