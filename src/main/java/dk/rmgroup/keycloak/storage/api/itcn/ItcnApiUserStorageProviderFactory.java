@@ -6,6 +6,7 @@ import static dk.rmgroup.keycloak.storage.api.itcn.ItcnApiUserStorageProviderCon
 import static dk.rmgroup.keycloak.storage.api.itcn.ItcnApiUserStorageProviderConstants.CONFIG_KEY_LOGIN_URL;
 import static dk.rmgroup.keycloak.storage.api.itcn.ItcnApiUserStorageProviderConstants.CONFIG_KEY_PASSWORD;
 import static dk.rmgroup.keycloak.storage.api.itcn.ItcnApiUserStorageProviderConstants.CONFIG_KEY_USERNAME;
+import static dk.rmgroup.keycloak.storage.api.itcn.ItcnApiUserStorageProviderConstants.CONFIG_KEY_ONLY_USE_GROUPS_IN_GROUP_MAP;
 
 import java.io.BufferedReader;
 import java.io.InputStream;
@@ -101,6 +102,14 @@ public class ItcnApiUserStorageProviderFactory
         .type(ProviderConfigProperty.STRING_TYPE)
         .helpText(
             "Specify the group map using a json object like this: {\"ITCN Group 1\": \"/Keycoak Group 1\", \"ITCN Group 2\": \"/Keycoak Group 2\"}, remember that group names are case sensitive!")
+        .add()
+        .property()
+        .name(
+            CONFIG_KEY_ONLY_USE_GROUPS_IN_GROUP_MAP)
+        .label("Only handle groups in group map")
+        .type(ProviderConfigProperty.BOOLEAN_TYPE)
+        .helpText(
+            "Disregard any and all groups not mentioned above")
         .add()
         .build();
   }
@@ -351,6 +360,9 @@ public class ItcnApiUserStorageProviderFactory
 
         });
 
+    String onlyUseGroupsInGroupMap = fedModel.getConfig()
+        .getFirst(CONFIG_KEY_ONLY_USE_GROUPS_IN_GROUP_MAP);
+
     if (totalExistingUsers > 0) {
       int totalPagesExistingUsers = (int) Math.ceil((double) totalExistingUsers / USER_REMOVE_PAGE_SIZE);
 
@@ -489,8 +501,20 @@ public class ItcnApiUserStorageProviderFactory
                       }
                     }
                   }
+
+                  HashSet<String> groupMapGroupIds = new HashSet<String>();
+
+                  for (GroupModel group : groupMap.values())
+                  {
+                    groupMapGroupIds.add(group.getId());
+                  }
+
                   List<GroupModel> groupsToLeave = importedUser.getGroupsStream().filter(g -> {
-                    return !groupIds.contains(g.getId());
+                    if (onlyUseGroupsInGroupMap.equals("true")) {
+                      return groupMapGroupIds.contains(g.getId()) && !groupIds.contains(g.getId());
+                    } else {
+                      return !groupIds.contains(g.getId());
+                    }
                   }).collect(Collectors.toList());
 
                   if (groupsToLeave.size() > 0) {

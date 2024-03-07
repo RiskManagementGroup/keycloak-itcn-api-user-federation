@@ -7,4 +7,5 @@ public final class ItcnApiUserStorageProviderConstants {
     public static final String CONFIG_KEY_PASSWORD = "password";
     public static final String CONFIG_KEY_ALLOW_UPDATE_UPN_DOMAINS = "allowUpdateUpnDomains";
     public static final String CONFIG_KEY_GROUP_MAP = "groupMap";
+    public static final String CONFIG_KEY_ONLY_USE_GROUPS_IN_GROUP_MAP = "onlyUseGroupsInGroupMap";
 }
