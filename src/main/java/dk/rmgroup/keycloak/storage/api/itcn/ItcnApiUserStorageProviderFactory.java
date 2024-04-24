@@ -360,8 +360,7 @@ public class ItcnApiUserStorageProviderFactory
 
         });
 
-    String onlyUseGroupsInGroupMap = fedModel.getConfig()
-        .getFirst(CONFIG_KEY_ONLY_USE_GROUPS_IN_GROUP_MAP);
+    Boolean onlyUseGroupsInGroupMap = fedModel.get(CONFIG_KEY_ONLY_USE_GROUPS_IN_GROUP_MAP, false);
 
     if (totalExistingUsers > 0) {
       int totalPagesExistingUsers = (int) Math.ceil((double) totalExistingUsers / USER_REMOVE_PAGE_SIZE);
@@ -380,9 +379,9 @@ public class ItcnApiUserStorageProviderFactory
 
             try {
               usersToRemove.addAll(userProvider
-                .searchForUserStream(realm, new HashMap<String, String>(), firstResult, maxResults)
-                .filter(u -> fedId.equals(u.getFederationLink()) && !apiUsersUpnSet.contains(u.getUsername()))
-                .collect(Collectors.toList()));
+                  .searchForUserStream(realm, new HashMap<String, String>(), firstResult, maxResults)
+                  .filter(u -> fedId.equals(u.getFederationLink()) && !apiUsersUpnSet.contains(u.getUsername()))
+                  .collect(Collectors.toList()));
             } catch (Exception e) {
               logger.errorf(e,
                   "Error getting users to remove in federation provider '%s'. Might not be able to remove all non existing users!",
@@ -504,13 +503,12 @@ public class ItcnApiUserStorageProviderFactory
 
                   HashSet<String> groupMapGroupIds = new HashSet<String>();
 
-                  for (GroupModel group : groupMap.values())
-                  {
+                  for (GroupModel group : groupMap.values()) {
                     groupMapGroupIds.add(group.getId());
                   }
 
                   List<GroupModel> groupsToLeave = importedUser.getGroupsStream().filter(g -> {
-                    if (onlyUseGroupsInGroupMap.equals("true")) {
+                    if (onlyUseGroupsInGroupMap) {
                       return groupMapGroupIds.contains(g.getId()) && !groupIds.contains(g.getId());
                     } else {
                       return !groupIds.contains(g.getId());
