@@ -24,6 +24,7 @@ import java.util.stream.IntStream;
 
 import org.jboss.logging.Logger;
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 import org.keycloak.component.ComponentModel;
 import org.keycloak.component.ComponentValidationException;
@@ -316,7 +317,7 @@ public class ItcnApiUserStorageProviderFactory
             errors.add(errorMessage);
           }
         });
-      } catch (Exception e) {
+      } catch (JSONException e) {
         String errorMessage = String.format("Error in group map JSON '%s'. '%s'", json, e.getMessage());
         logger.error(errorMessage, e);
         errors.add(errorMessage);
