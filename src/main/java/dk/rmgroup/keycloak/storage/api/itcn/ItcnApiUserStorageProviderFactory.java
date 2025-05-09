@@ -286,6 +286,7 @@ public class ItcnApiUserStorageProviderFactory
     final GroupMapConfig groupMapConfig = new GroupMapConfig();
     KeycloakModelUtils.runJobInTransaction(sessionFactory, session -> {
       RealmModel realm = session.realms().getRealm(realmId);
+      session.getContext().setRealm(realm);
       groupMapConfig.setProperties(GetGroupMapConfig(session, realm, config));
     });
     return groupMapConfig;
@@ -344,6 +345,7 @@ public class ItcnApiUserStorageProviderFactory
         (KeycloakSession session) -> {
           try {
             RealmModel realm = session.realms().getRealm(realmId);
+            session.getContext().setRealm(realm);
             UserProvider userProvider = session.users();
             return userProvider.getUsersCount(realm);
           } catch (Exception e) {
@@ -364,6 +366,7 @@ public class ItcnApiUserStorageProviderFactory
       IntStream.range(0, totalPagesExistingUsers).parallel().forEach(page -> {
         KeycloakModelUtils.runJobInTransaction(sessionFactory, (KeycloakSession session) -> {
           RealmModel realm = session.realms().getRealm(realmId);
+          session.getContext().setRealm(realm);
           UserProvider userProvider = session.users();
           int firstResult = page * USER_REMOVE_PAGE_SIZE;
           int maxResults = USER_REMOVE_PAGE_SIZE;
@@ -389,6 +392,7 @@ public class ItcnApiUserStorageProviderFactory
 
           KeycloakModelUtils.runJobInTransaction(sessionFactory, (KeycloakSession session) -> {
             RealmModel realm = session.realms().getRealm(realmId);
+            session.getContext().setRealm(realm);
             UserProvider userProvider = session.users();
 
             int startIndex = page * USER_REMOVE_PAGE_SIZE;
@@ -419,6 +423,7 @@ public class ItcnApiUserStorageProviderFactory
       IntStream.range(0, totalPagesApiUsers).parallel().forEach(page -> {
         KeycloakModelUtils.runJobInTransaction(sessionFactory, (KeycloakSession session) -> {
           RealmModel realm = session.realms().getRealm(realmId);
+          session.getContext().setRealm(realm);
           UserProvider userProvider = session.users();
 
           int startIndex = page * USER_IMPORT_PAGE_SIZE;

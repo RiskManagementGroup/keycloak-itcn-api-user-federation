@@ -40,6 +40,7 @@ public class ItcnAdminEventLogger {
 
   public static void Log(KeycloakSession session, String realmId, String resourcePath, Object representation) {
     RealmModel realm = session.realms().getRealm(realmId);
+    session.getContext().setRealm(realm);
     AdminEventBuilder adminEventBuilder = new AdminEventBuilder(realm, getAdminAuth(realm), session,
         getClientConnection());
 
@@ -737,7 +738,7 @@ public class ItcnAdminEventLogger {
 
       @Override
       public String getRemoteHost() {
-        throw new UnsupportedOperationException("Unimplemented method 'getRemoteHost'");
+        return "127.0.0.1";
       }
 
       @Override
