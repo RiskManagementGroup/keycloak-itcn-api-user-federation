@@ -28,6 +28,8 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import org.keycloak.component.ComponentModel;
 import org.keycloak.component.ComponentValidationException;
+import org.keycloak.email.EmailException;
+import org.keycloak.email.EmailSenderProvider;
 import org.keycloak.models.GroupModel;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.KeycloakSessionFactory;
@@ -206,10 +208,21 @@ public class ItcnApiUserStorageProviderFactory
       UserStorageProviderModel model) {
     ItcnAdminEventLogger adminEventLogger = new ItcnAdminEventLogger(sessionFactory, realmId);
 
-    adminEventLogger.Log(String.format("user-storage/%s/sync-starting", model.getName()),
-        String.format("Starting ITCN user synchronization for '%s'", model.getName()));
+    KeycloakSession session = sessionFactory.create();
+
+    RealmModel realm = session.realms().getRealm(realmId);
+
+    EmailSenderProvider emailSenderProvider = session.getProvider(EmailSenderProvider.class);
+
+    try {
+      adminEventLogger.Log(String.format("user-storage/%s/sync-starting", model.getName()),
+          String.format("Starting ITCN user synchronization for '%s'", model.getName()));
+    } catch (Exception e) {
+      logger.errorf(e, "ITCN error logging");
+    }
 
     SynchronizationResult synchronizationResult = new SynchronizationResult();
+    List<String> errors = new ArrayList<>();
 
     boolean hasImportFinished = false;
 
@@ -231,32 +244,65 @@ public class ItcnApiUserStorageProviderFactory
 
           GroupMapConfig groupMapConfig = GetGroupMapConfig(sessionFactory, realmId, model);
 
-          synchronizationResult = importApiUsers(sessionFactory, realmId, model, apiUsers, allowUpdateUpnDomains,
+          ItcnApiUserResult result = importApiUsers(sessionFactory, realmId, model, apiUsers, allowUpdateUpnDomains,
               groupMapConfig.groupMap);
+
+          synchronizationResult = result.synchronizationResult;
+          errors = result.errors;
 
           hasImportFinished = true;
         } catch (Exception e) {
           logger.errorf(e, "Error importing api users for federation provider '%s'!",
               model.getName());
+          errors.add(String.format("Error importing api users for federation provider '%s'! Exception:<br/>%s",
+              model.getName(), getErrorMessage(e)));
           synchronizationResult.setFailed(1);
         }
       } catch (Exception e) {
         logger.errorf(e, "Error getting users for federation provider '%s'. Please check ActiveDirectory endpoint url!",
             model.getName());
+        errors.add(String.format(
+            "Error getting users for federation provider '%s'. Please check ActiveDirectory endpoint url! Exception:<br/>%s",
+            model.getName(), getErrorMessage(e)));
         synchronizationResult.setFailed(1);
       }
     } catch (Exception e) {
       logger.errorf(e,
           "Error getting token for federation provider '%s'. Please check Login endpoint URL and username and password!",
           model.getName());
+      errors.add(String.format(
+          "Error getting token for federation provider '%s'. Please check Login endpoint URL and username and password! Exception:<br/>%s",
+          model.getName(), getErrorMessage(e)));
       synchronizationResult.setFailed(1);
     }
 
     if (hasImportFinished) {
       adminEventLogger.Log(String.format("user-storage/%s/sync-finished", model.getName()), synchronizationResult);
+
+      if (synchronizationResult.getFailed() > 0) {
+        try {
+          String body = String.format(
+              "Error during user synchronization for federation provider '%s' in realm: '%s'. %s users failed syncing. Errors:<br/><br/>%s",
+              model.getName(), realm.getName(), synchronizationResult.getFailed(), String.join("<br/><br/>", errors));
+
+          emailSenderProvider.send(realm.getSmtpConfig(), "log.rmgroup@f24.com", "Error in user sync", body, body);
+        } catch (EmailException ex) {
+          logger.errorf(ex, "Failed to send email");
+        }
+      }
     } else {
       adminEventLogger.Log(String.format("user-storage/%s/sync-error", model.getName()),
           "See server log for more details!");
+
+      try {
+        String body = String.format(
+            "Error during user synchronization for federation provider '%s' in realm: '%s'. Errors:<br/><br/>%s",
+            model.getName(), realm.getName(), String.join("<br/><br/>", errors));
+
+        emailSenderProvider.send(realm.getSmtpConfig(), "log.rmgroup@f24.com", "Error in user sync", body, body);
+      } catch (EmailException ex) {
+        logger.errorf(ex, "Failed to send email");
+      }
     }
 
     return synchronizationResult;
@@ -328,13 +374,15 @@ public class ItcnApiUserStorageProviderFactory
     return groupMapConfig;
   }
 
-  private SynchronizationResult importApiUsers(KeycloakSessionFactory sessionFactory, final String realmId,
+  private ItcnApiUserResult importApiUsers(KeycloakSessionFactory sessionFactory, final String realmId,
       final ComponentModel fedModel, List<ItcnApiUser> apiUsers, List<String> allowUpdateUpnDomains,
       Map<String, GroupModel> groupMap) {
     final String fedId = fedModel.getId();
 
     final Set<String> apiUsersUpnSet = apiUsers.stream().map(u -> u.getUpn()).distinct()
         .collect(Collectors.toSet());
+
+    final List<String> errors = new ArrayList<>();
 
     final AtomicInteger removedCount = new AtomicInteger(0);
     final AtomicInteger addedCount = new AtomicInteger(0);
@@ -352,6 +400,9 @@ public class ItcnApiUserStorageProviderFactory
             logger.errorf(e,
                 "Error getting user count in federation provider '%s'. Will not be able to remove non existing users!",
                 fedModel.getName());
+            errors.add(String.format(
+                "Error getting user count in federation provider '%s'. Will not be able to remove non existing users! Exception:<br/>%s",
+                fedModel.getName(), getErrorMessage(e)));
             return -1;
           }
         });
@@ -380,6 +431,9 @@ public class ItcnApiUserStorageProviderFactory
             logger.errorf(e,
                 "Error getting users to remove in federation provider '%s'. Might not be able to remove all non existing users!",
                 fedModel.getName());
+            errors.add(String.format(
+                "Error getting users to remove in federation provider '%s'. Might not be able to remove all non existing users! Exception:<br/>%s",
+                fedModel.getName(), getErrorMessage(e)));
           }
         });
       });
@@ -408,6 +462,9 @@ public class ItcnApiUserStorageProviderFactory
                 logger.errorf(e,
                     "Error removing non existing user with username '%s' in federation provider '%s'",
                     user.getUsername(), fedModel.getName());
+                errors.add(String.format(
+                    "Error removing non existing user with username '%s' in federation provider '%s'. Exception:<br/>%s",
+                    user.getUsername(), fedModel.getName(), getErrorMessage(e)));
                 failedCount.incrementAndGet();
               }
             }
@@ -446,6 +503,9 @@ public class ItcnApiUserStorageProviderFactory
                     logger.warnf(
                         "User with UPN '%s' is not updated during sync as he already exists in Keycloak database but is not linked to federation provider '%s' and UPN domain does not match any of '%s'",
                         apiUser.getUpn(), fedModel.getName(), String.join(", ", allowUpdateUpnDomains));
+                    errors.add(String.format(
+                        "User with UPN '%s' is not updated during sync as he already exists in Keycloak database but is not linked to federation provider '%s' and UPN domain does not match any of '%s'",
+                        apiUser.getUpn(), fedModel.getName(), String.join(", ", allowUpdateUpnDomains)));
                     failedCount.incrementAndGet();
                     return;
                   }
@@ -454,6 +514,9 @@ public class ItcnApiUserStorageProviderFactory
                   logger.warnf(
                       "User with UPN '%s' is not updated during sync as he already exists in Keycloak database but is not linked to federation provider '%s'",
                       apiUser.getUpn(), fedModel.getName());
+                  errors.add(String.format(
+                      "User with UPN '%s' is not updated during sync as he already exists in Keycloak database but is not linked to federation provider '%s'",
+                      apiUser.getUpn(), fedModel.getName()));
                   failedCount.incrementAndGet();
                   return;
                 }
@@ -520,6 +583,9 @@ public class ItcnApiUserStorageProviderFactory
               logger.errorf(e,
                   "Error importing user from api with username '%s' in federation provider '%s'",
                   apiUser.getUpn(), fedModel.getName());
+              errors.add(String.format(
+                  "Error importing user from api with username '%s' in federation provider '%s'. Exception:<br/>%s",
+                  apiUser.getUpn(), fedModel.getName(), getErrorMessage(e)));
               failedCount.incrementAndGet();
             }
           });
@@ -535,7 +601,7 @@ public class ItcnApiUserStorageProviderFactory
     syncResult.setRemoved(removedCount.get());
     syncResult.setFetched(totalApiUsers);
 
-    return syncResult;
+    return new ItcnApiUserResult(syncResult, errors);
   }
 
   private static boolean apiUserEqualsLocalUser(ItcnApiUser apiUser, UserModel existingLocalUser) {
@@ -602,5 +668,16 @@ public class ItcnApiUserStorageProviderFactory
       }).collect(Collectors.toList());
       return users;
     }
+  }
+
+  private String getErrorMessage(Throwable e) {
+    String errorMessage = e.getMessage();
+    Throwable cause = e.getCause();
+
+    if (cause != null) {
+      errorMessage += "<br/>Caused by: " + getErrorMessage(cause);
+    }
+
+    return errorMessage;
   }
 }
