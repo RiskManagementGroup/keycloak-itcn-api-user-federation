@@ -5,7 +5,7 @@
 
   <groupId>dk.rmgroup.keycloak</groupId>
   <artifactId>itcn-api-user-federation</artifactId>
-  <version>26.2.5</version>
+  <version>26.2.5-1</version>
 
   <name>itcn-api-user-federation</name>
   <url>https://github.com/RiskManagementGroup/keycloak-itcn-api-user-federation</url>
