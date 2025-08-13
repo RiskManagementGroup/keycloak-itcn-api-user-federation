@@ -45,8 +45,11 @@ import org.keycloak.storage.managers.UserStorageSyncManager;
 import org.keycloak.storage.user.ImportSynchronization;
 import org.keycloak.storage.user.SynchronizationResult;
 
+import com.google.common.base.Strings;
+
 import static dk.rmgroup.keycloak.storage.api.itcn.ItcnApiUserStorageProviderConstants.CONFIG_KEY_ACTIVE_DIRECTORY_URL;
 import static dk.rmgroup.keycloak.storage.api.itcn.ItcnApiUserStorageProviderConstants.CONFIG_KEY_ALLOW_UPDATE_UPN_DOMAINS;
+import static dk.rmgroup.keycloak.storage.api.itcn.ItcnApiUserStorageProviderConstants.CONFIG_KEY_DO_NOT_OVERRIDE_MOBILE_WITH_EMPTY;
 import static dk.rmgroup.keycloak.storage.api.itcn.ItcnApiUserStorageProviderConstants.CONFIG_KEY_GROUP_MAP;
 import static dk.rmgroup.keycloak.storage.api.itcn.ItcnApiUserStorageProviderConstants.CONFIG_KEY_LOGIN_URL;
 import static dk.rmgroup.keycloak.storage.api.itcn.ItcnApiUserStorageProviderConstants.CONFIG_KEY_ONLY_USE_GROUPS_IN_GROUP_MAP;
@@ -111,6 +114,12 @@ public class ItcnApiUserStorageProviderFactory
         .type(ProviderConfigProperty.BOOLEAN_TYPE)
         .helpText(
             "Disregard any and all groups not mentioned above")
+        .add()
+        .property()
+        .name(CONFIG_KEY_DO_NOT_OVERRIDE_MOBILE_WITH_EMPTY)
+        .label("Do not override mobile numbers with empty value")
+        .type(ProviderConfigProperty.BOOLEAN_TYPE)
+        .helpText("If enabled, the mobile phone number will not be overridden if the new value is empty.")
         .add()
         .build();
   }
@@ -244,8 +253,10 @@ public class ItcnApiUserStorageProviderFactory
 
           GroupMapConfig groupMapConfig = GetGroupMapConfig(sessionFactory, realmId, model);
 
+          Boolean doNotOverrideMobileWithEmpty = model.get(CONFIG_KEY_DO_NOT_OVERRIDE_MOBILE_WITH_EMPTY, false);
+
           ItcnApiUserResult result = importApiUsers(sessionFactory, realmId, model, apiUsers, allowUpdateUpnDomains,
-              groupMapConfig.groupMap);
+              groupMapConfig.groupMap, doNotOverrideMobileWithEmpty);
 
           synchronizationResult = result.synchronizationResult;
           errors = result.errors;
@@ -376,7 +387,7 @@ public class ItcnApiUserStorageProviderFactory
 
   private ItcnApiUserResult importApiUsers(KeycloakSessionFactory sessionFactory, final String realmId,
       final ComponentModel fedModel, List<ItcnApiUser> apiUsers, List<String> allowUpdateUpnDomains,
-      Map<String, GroupModel> groupMap) {
+      Map<String, GroupModel> groupMap, Boolean doNotOverrideMobileWithEmpty) {
     final String fedId = fedModel.getId();
 
     final Set<String> apiUsersUpnSet = apiUsers.stream().map(u -> u.getUpn()).distinct()
@@ -530,7 +541,10 @@ public class ItcnApiUserStorageProviderFactory
                 importedUser.setEmailVerified(true);
                 importedUser.setFirstName(apiUser.getFirstName());
                 importedUser.setLastName(apiUser.getSurName());
-                importedUser.setSingleAttribute("mobile", apiUser.getMobilePhone());
+                String mobilePhone = apiUser.getMobilePhone();
+                if (!Strings.isNullOrEmpty(mobilePhone) || !doNotOverrideMobileWithEmpty) {
+                  importedUser.setSingleAttribute("mobile", mobilePhone);
+                }
                 importedUser.setEnabled(true);
               }
 
