@@ -32,13 +32,13 @@ public class ItcnAdminEventLogger {
     this.realmId = realmId;
   }
 
-  public void Log(String resourcePath, Object representation) {
+  public void log(String resourcePath, Object representation) {
     KeycloakModelUtils.runJobInTransaction(sessionFactory, (KeycloakSession session) -> {
-      Log(session, realmId, resourcePath, representation);
+      log(session, realmId, resourcePath, representation);
     });
   }
 
-  public static void Log(KeycloakSession session, String realmId, String resourcePath, Object representation) {
+  public static void log(KeycloakSession session, String realmId, String resourcePath, Object representation) {
     RealmModel realm = session.realms().getRealm(realmId);
     session.getContext().setRealm(realm);
     AdminEventBuilder adminEventBuilder = new AdminEventBuilder(realm, getAdminAuth(realm), session,

@@ -167,7 +167,7 @@ public class ItcnApiUserStorageProviderFactory
       throw new ComponentValidationException("ActiveDirectory endpoint URL is required!");
     }
 
-    GroupMapConfig groupMapConfig = GetGroupMapConfig(session, realm, config);
+    GroupMapConfig groupMapConfig = getGroupMapConfig(session, realm, config);
 
     if (!groupMapConfig.errors.isEmpty() || !groupMapConfig.criticalErrors.isEmpty()) {
       List<String> allErrors = new ArrayList<>();
@@ -227,7 +227,7 @@ public class ItcnApiUserStorageProviderFactory
     EmailSenderProvider emailSenderProvider = session.getProvider(EmailSenderProvider.class);
 
     try {
-      adminEventLogger.Log(String.format("user-storage/%s/sync-starting", model.getName()),
+      adminEventLogger.log(String.format("user-storage/%s/sync-starting", model.getName()),
           String.format("Starting ITCN user synchronization for '%s'", model.getName()));
     } catch (Exception e) {
       logger.errorf(e, "ITCN error logging");
@@ -249,12 +249,12 @@ public class ItcnApiUserStorageProviderFactory
           String allowUpdateUpnDomainsCommaSeparated = model.get(CONFIG_KEY_ALLOW_UPDATE_UPN_DOMAINS);
 
           List<String> allowUpdateUpnDomains = null;
-          if (allowUpdateUpnDomainsCommaSeparated != null && allowUpdateUpnDomainsCommaSeparated.length() > 0) {
-            allowUpdateUpnDomains = Arrays.stream(allowUpdateUpnDomainsCommaSeparated.split(",")).map(d -> d.trim())
+          if (allowUpdateUpnDomainsCommaSeparated != null && !allowUpdateUpnDomainsCommaSeparated.isEmpty()) {
+            allowUpdateUpnDomains = Arrays.stream(allowUpdateUpnDomainsCommaSeparated.split(",")).map(String::trim)
                 .collect(Collectors.toList());
           }
 
-          GroupMapConfig groupMapConfig = GetGroupMapConfig(sessionFactory, realmId, model);
+          GroupMapConfig groupMapConfig = getGroupMapConfig(sessionFactory, realmId, model);
 
           if (!groupMapConfig.criticalErrors.isEmpty()) {
             throw new ConfigException(String.format("Critical errors found in Group map: %s",
@@ -298,10 +298,12 @@ public class ItcnApiUserStorageProviderFactory
           "Error getting token for federation provider '%s'. Please check Login endpoint URL and username and password! Exception:<br/>%s",
           model.getName(), getErrorMessage(e)));
       synchronizationResult.setFailed(1);
+    } finally {
+      session.close();
     }
 
     if (hasImportFinished) {
-      adminEventLogger.Log(String.format("user-storage/%s/sync-finished", model.getName()), synchronizationResult);
+      adminEventLogger.log(String.format("user-storage/%s/sync-finished", model.getName()), synchronizationResult);
 
       if (synchronizationResult.getFailed() > 0) {
         try {
@@ -315,7 +317,7 @@ public class ItcnApiUserStorageProviderFactory
         }
       }
     } else {
-      adminEventLogger.Log(String.format("user-storage/%s/sync-error", model.getName()),
+      adminEventLogger.log(String.format("user-storage/%s/sync-error", model.getName()),
           "See server log for more details!");
 
       try {
@@ -358,18 +360,18 @@ public class ItcnApiUserStorageProviderFactory
     }
   }
 
-  private GroupMapConfig GetGroupMapConfig(KeycloakSessionFactory sessionFactory, final String realmId,
+  private GroupMapConfig getGroupMapConfig(KeycloakSessionFactory sessionFactory, final String realmId,
       ComponentModel config) {
     final GroupMapConfig groupMapConfig = new GroupMapConfig();
     KeycloakModelUtils.runJobInTransaction(sessionFactory, session -> {
       RealmModel realm = session.realms().getRealm(realmId);
       session.getContext().setRealm(realm);
-      groupMapConfig.setProperties(GetGroupMapConfig(session, realm, config));
+      groupMapConfig.setProperties(getGroupMapConfig(session, realm, config));
     });
     return groupMapConfig;
   }
 
-  private GroupMapConfig GetGroupMapConfig(KeycloakSession session, RealmModel realm, ComponentModel config) {
+  private GroupMapConfig getGroupMapConfig(KeycloakSession session, RealmModel realm, ComponentModel config) {
     GroupMapConfig groupMapConfig = new GroupMapConfig();
     Map<String, GroupModel> groupMap = groupMapConfig.groupMap;
     List<String> errors = groupMapConfig.errors;
@@ -531,7 +533,7 @@ public class ItcnApiUserStorageProviderFactory
                   importedUser = existingLocalUser;
                 } else if (allowUpdateUpnDomains != null) {
                   String upn = apiUser.getUpn();
-                  if (!allowUpdateUpnDomains.stream().anyMatch(domain -> upn.endsWith("@" + domain))) {
+                  if (allowUpdateUpnDomains.stream().noneMatch(domain -> upn.endsWith("@" + domain))) {
                     logger.warnf(
                         "User with UPN '%s' is not updated during sync as he already exists in Keycloak database but is not linked to federation provider '%s' and UPN domain does not match any of '%s'",
                         apiUser.getUpn(), fedModel.getName(), String.join(", ", allowUpdateUpnDomains));
@@ -603,9 +605,7 @@ public class ItcnApiUserStorageProviderFactory
 
                 if (!groupsToLeave.isEmpty()) {
                   groupsChanged = true;
-                  groupsToLeave.forEach(g -> {
-                    importedUser.leaveGroup(g);
-                  });
+                  groupsToLeave.forEach(importedUser::leaveGroup);
                 }
               }
 
@@ -696,7 +696,7 @@ public class ItcnApiUserStorageProviderFactory
         String[] groups = new String[] {};
         if (o.has("Groups") && !o.isNull("Groups")) {
           JSONArray gr = o.getJSONArray("Groups");
-          groups = IntStream.range(0, gr.length()).mapToObj(j -> gr.getString(j)).toArray(String[]::new);
+          groups = IntStream.range(0, gr.length()).mapToObj(gr::getString).toArray(String[]::new);
         }
         return new ItcnApiUser(o.getString("UPN"), o.getString("Email"), o.optString("FirstName"),
             o.optString("SurName"), o.optString("MobilePhone"), groups);
